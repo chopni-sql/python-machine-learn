@@ -1,0 +1,588 @@
+'''
+Demo purpose only.
+Andrew Chu’s Python ‘Machine Learning’ programming, model building and testing. 
+All programming here is designed, constructed, and implemented by Andrew Chu.
+Section 1, Python, 8 programs. Classification. Regression. Recommendation System collaborative filter. 
+Section 2, SQL analysis.
+
+Section 1, Python, 8 programs. 
+
+Classification: Program 1,2,3
+
+Program 1,
+Estimator, Algorithm: SVC, LogisticRegression, KNeighbors.  GridSearchCV 
+Intent: classification, success or fail, SpaceX satellite rocket recapture .
+Data source: wikipedia.org
+Preprocess: web scrape. clean, massage, preprocess.
+
+
+Program start,
+'''
+
+import pandas as pd
+import numpy as np
+
+
+#  extract dataframes based on wikipedia.org tables.
+
+f=pd.read_html('https://en.wikipedia.org/w/index.php?title=List_of_Falcon_9_and_Falcon_Heavy_launches&oldid=1027686922', match='Payload mass')
+
+# join dataframes 'bottom-to-top', columns aligned
+d=pd.DataFrame(np.concatenate([i.values for i in f ] ,axis=0) ,columns=f[1].columns)
+
+
+# select row index by field values F9(rocket type), Success, Failure. delete some column index.
+d=d[d['Version,Booster[b]'].str.contains('F9.*')&d['Boosterlanding'].str.contains('Success.*|Failure.*')].drop(['Date andtime (UTC)','Customer','Payload[c]'],axis=1).reset_index(drop=True)
+
+
+# clean massage data, transform string to numeric. retain,discard some info eg, 'Payload mass' retains numbers of kg only.
+d=d.replace(regex={'Version,Booster[b]':{'F9.*':1}, 'Launch site' :{'.*40.*':1,'.*39.*':2,'.*4E.*':3}, 'Payload mass' :{r'.*?(\d+)?,?(\d+).*kg.*' : r'\1\2'}, 'Orbit':{r'(.*)\[.+\].*' : r'\1',}, 'Launchoutcome' :{'.*Success.*':1, }, 'Boosterlanding' :{'.*Success.*':1,'.*Failure.*':0,}, })    
+     
+ 
+# tranform 'Payload mass' to numeric.
+d ['Payloadmass']=d ['Payload mass'].apply(pd.to_numeric, errors='coerce')
+
+# set each 'Payloadmass' np.nan to its associated orbit subgroup's median Payloadmass value. 
+b=d.Payloadmass.isnull()
+d.Payloadmass[d[b].index] = d.groupby('Orbit')['Payloadmass'].median() [d.Orbit[b]]
+
+                                           
+# visualize Payloadmass distribution via grouping Launch site and Orbit. 
+
+import seaborn as sns
+sns.catplot(data=d,x='Orbit',y='Payloadmass', kind='box',col='Launch site' , height=3, aspect=1,  ).set_xticklabels(rotation=90)
+
+
+# 'Orbit' one-hot. It’s the most determinant feature.
+orb =pd.get_dummies(d.Orbit)
+
+from sklearn.preprocessing import StandardScaler as s
+X=s().fit_transform(d[['Flight No.' ,'Version,Booster[b]' ,'Launch site','Launchoutcome' ,'Payloadmass']].join(orb))
+Y=d.Boosterlanding.values
+
+# SVC, LogisticRegression, KNeighbors classification.  GridSearchCV , parameters fine tune.  Model results.
+from sklearn.model_selection import train_test_split as tts, GridSearchCV as gs 
+from  sklearn.svm import SVC as svc
+from  sklearn.linear_model   import LogisticRegression as lr
+from  sklearn.neighbors import KNeighborsClassifier as kn
+!pip install scikit-optimize
+
+xtr,xts,ytr,yts=tts(X,Y,test_size=0.2,random_state=2)
+
+for i in (
+ (svc(),
+  {'kernel':['linear','rbf','poly','sigmoid'],'C':np.logspace(-3,1,6) , 'gamma':np.logspace(-3,1,6),  } ),
+ (lr(),
+  {'C':np.logspace(-3,1,6),'solver':['newton-cg','lbfgs','liblinear','sag','saga'], 'max_iter':[1000]}),
+ (kn(),
+  {'n_neighbors':np.arange(3,7,1),'algorithm':['auto','ball_tree','kd_tree','brute'] ,'p':[1,2]})):
+    
+    w=gs(i[0],i[1],   cv=3   ).fit(xtr,ytr)
+    print(i[0],   '\n test %.2f' % w.score(xts,yts),     w.best_params_,   'best score %.2f' % w.best_score_)
+
+
+Program 1 End.  
+
+Conclusion: SVC, LogisticRegression, KNeighbors train accuracy is the same 0.89. test data accuracy is 0.84. If Orbit is the only X feature, train, test accuracy remain the same 0.89, 0.84 as full features. Model accuracy remains 0.89 even when parameters vary within some range . so, at 'some point', parameter adjustment can be stopped.    
+
+
+--------------------------------------------------------------------------------------
+
+
+Program 2, 
+Estimator, Algorithm: GaussianNB, MultinomialNB, ComplementNB.  GridSearchCV 
+—----
+(setting similar to Program 1)
+Intent: classification, success or fail, SpaceX satellite rocket recapture .
+Data source: wikipedia.org 
+Preprocess: web scrape. clean, massage, preprocess.
+
+(Screenshot from JupyterLab) 
+# Program start,
+
+import pandas as pd
+import numpy as np
+f=pd.read_html('https://en.wikipedia.org/w/index.php?title=List_of_Falcon_9_and_Falcon_Heavy_launches&oldid=1027686922', 
+               match='Payload mass')
+d=pd.DataFrame(np.concatenate([i.values for i in f ] ,axis=0) ,columns=f[1].columns)
+d=d[d['Version,Booster[b]'].str.contains('F9.*')&d['Boosterlanding'].str.contains('Success.*|Failure.*')].drop(
+    ['Date andtime (UTC)','Customer','Payload[c]'],axis=1).reset_index(drop=True)
+d=d.replace(regex={'Version,Booster[b]':{'F9.*':1},     'Launch site' :{'.*40.*':40,'.*39.*':39,'.*4E.*':4},    
+                   'Payload mass' :{r'.*?(\d+)?,?(\d+).*kg.*' : r'\1\2'},        'Orbit':{r'(.*)\[.+\].*' : r'\1',},     
+                   'Launchoutcome' :{'.*Success.*':1, },     'Boosterlanding' :{'.*Success.*':1,'.*Failure.*':0,}, })         
+ 
+d ['Payloadmass']=d ['Payload mass'].apply(pd.to_numeric, errors='coerce') 
+b=d.Payloadmass.isnull()
+d.Payloadmass[d[b].index] = d.groupby('Orbit')['Payloadmass'].median() [d.Orbit[b]]
+o=pd.get_dummies(d.Orbit)
+
+X= d[['Flight No.' ,'Version,Booster[b]' ,'Launch site','Launchoutcome' ,'Payloadmass']].join(o).values 
+Y=d.Boosterlanding.values 
+
+
+from sklearn.model_selection import train_test_split as tts, GridSearchCV as gs 
+from sklearn.naive_bayes import GaussianNB as g, MultinomialNB as m, ComplementNB as cm
+
+xtr,xts,ytr,yts=tts(X,Y,test_size=0.2,random_state=2)
+
+for i in ( 
+ (g(),
+  {'var_smoothing':np.logspace(-10,-6,15)}),
+ (m(),
+  {'alpha':np.logspace(1,2,20),'fit_prior':['True','False' ]}),
+ (cm(),
+  {'alpha':np.logspace(1,2,20),'fit_prior':['True','False' ]})):
+    
+    w=gs(i[0],i[1],       cv=5    ).fit(xtr,ytr)
+    print(i[0],'test %.2f' % w.score(xts,yts),w.best_params_, 'best score %.2f' %  w.best_score_)
+
+
+# Program 2 End.
+
+Conclusion:  Gaussian,Multinomial,ComplementNB train accuracy are 0.90, 0.89, 0.88. test accuracy 0.84, 0.84, 0.89.
+If GridSearch, cv=10, then Gaussian,Multinomial,ComplementNB train accuracy are same 0.88. test accuracy 0.84, 0.95, 0.95.
+GaussianNB has the highest train accuracy. ComplementNB highest test accuracy.
+
+------------------------------------------------------------------------------
+
+
+Program 3, 
+Estimator, Algorithm: RandomForestClassifier.  BayesSearchCV
+—----
+(setting similar to Program 1) 
+Intent: classification, success or fail, SpaceX satellite rocket recapture .
+Data source: wikipedia.org 
+Preprocess: web scrape. clean, massage, preprocess.
+
+(Screenshot from JupyterLab) 
+Program start,
+
+import pandas as pd
+import numpy as np
+
+f=pd.read_html('https://en.wikipedia.org/w/index.php?title=List_of_Falcon_9_and_Falcon_Heavy_launches&oldid=1027686922', 
+               match='Payload mass')
+d=pd.DataFrame(np.concatenate([i.values for i in f ] ,axis=0) ,columns=f[1].columns)
+d=d[d['Version,Booster[b]'].str.contains('F9.*')&d['Boosterlanding'].str.contains('Success.*|Failure.*')].drop(
+    ['Date andtime (UTC)','Customer','Payload[c]'],axis=1).reset_index(drop=True)
+d=d.replace(regex={'Version,Booster[b]':{'F9.*':1},     'Launch site' :{'.*40.*':40,'.*39.*':39,'.*4E.*':4},    
+                   'Payload mass' :{r'.*?(\d+)?,?(\d+).*kg.*' : r'\1\2'},        'Orbit':{r'(.*)\[.+\].*' : r'\1',},     
+                   'Launchoutcome' :{'.*Success.*':1, },     'Boosterlanding' :{'.*Success.*':1,'.*Failure.*':0,}, })         
+ 
+d ['mass']=d ['Payload mass'].apply(pd.to_numeric, errors='coerce') 
+b=d.mass.isnull()
+d.mass[d[b].index] = d.groupby('Orbit')['mass'].median() [d.Orbit[b]]
+o=pd.get_dummies(d.Orbit)
+
+X= d[['Flight No.' ,'Version,Booster[b]' ,'Launch site','Launchoutcome' ,'mass']].join(o) .values
+Y=d.Boosterlanding.values
+
+from sklearn.model_selection import train_test_split as tts 
+from  sklearn.ensemble import RandomForestClassifier as rf
+from skopt import BayesSearchCV as bs
+
+xtr,xts,ytr,yts=tts(X,Y,test_size=0.2,random_state=2)
+
+for i in ((rf(),
+  { 'n_estimators' : np.arange(180,187,1),'criterion':['gini','entropy',],'max_depth':np.arange(1,5,1),
+      'min_samples_split':np.arange(6,11,1),'min_samples_leaf':np.arange(3,6,1),'max_features':np.arange(6,11,1),
+  }),
+  ):
+    
+    w=bs(i[0],i[1],    n_iter=30, random_state=2   , n_points=6  ).fit(xtr,ytr)
+    print(i[0],'\n test %.2f' % w.score(xts,yts),'\n ', w.best_params_, '\n best score %.2f' %  w.best_score_)
+
+Program 3 End.
+
+Conclusion: RandomForestClassifier train accuracy 0.89. test accuracy 0.84. Execution time is longer than other estimators.  
+Each set of parameters builds one model and result. The total number of models built from the many sets of parameters are large. 
+This process consumes time. Best parameters value ranges may take several adjustments and execution. As sklearn states, 
+RandomForest is built by assembly of many DecisionTrees on different subsets of a set of data, and averages those ‘trees’ results. 
+This process consumes time. 
+
+
+---------------------------------------------------------------------------------------------
+
+Regression: Program 4,5,6
+
+Program 4, 
+Estimator, Algorithm: Ridge, ElasticNet.  GridSearchCV 
+Intent: regression, auto vehicle characteristics, price .
+Data source: IBM 
+Preprocess: clean, massage, preprocess.
+
+Program start,
+
+import pandas as pd
+import numpy as np
+filename = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-DA0101EN-SkillsNetwork/labs/Data%20files/auto.csv"
+headers = ["symboling","normalized-losses","make","fuel-type","aspiration", "num-of-doors","body-style",
+         "drive-wheels","engine-location","wheel-base", "length","width","height","curb-weight","engine-type",
+         "num-of-cylinders", "engine-size","fuel-system","bore","stroke","compression-ratio","horsepower",
+         "peak-rpm","city-mpg","highway-mpg","price"]
+csv = pd.read_csv(filename, names = headers)
+
+
+
+df=csv.replace('?',np.nan).dropna(axis=0,subset=['price']).reset_index(drop=True)
+o=df.select_dtypes(include=[object  ]).drop('normalized-losses',axis=1)
+
+true_object=o.iloc[:, :-5 ]
+
+obj_to_num=o.iloc[:, -5: ].apply(pd.to_numeric,errors='coerce')
+n=df.select_dtypes(include=[ 'number'  ]).drop(['symboling', ],axis=1)
+
+num=obj_to_num.join(n)
+                                                                          
+all_num=num .fillna({'bore': num.bore.mean(), 'stroke': num.stroke.mean(), 'horsepower': num.horsepower.mean(), 'peak-rpm': num['peak-rpm'].mean(),    }  )
+
+                                                                      
+# -- start X Y feature selection.
+
+# Pearson correlation. 0.5 to be ‘safe’ cutoff. 
+
+ftrs0=all_num.corr().query( (  '  price >0.5')   ).index
+
+# hand pick. features having high correlation to price.
+ftrs0=[ 'horsepower', 'price',  'bore',   'length', 'width',
+       'curb-weight', 'engine-size']
+ 
+
+# ANOVA.  Test categorical features that cause significant price shifts.
+from scipy.stats import f_oneway as f
+for i in true_object.columns:
+    g=true_object.join(df.price)
+    print(i,f(* np.array((g.groupby(i)['price']), )[:,1]))
+
+# hand pick features,  price subsets averages showed significant differences. 
+ftrs1 = [   'engine-location',   'make',   'drive-wheels',   'num-of-cylinders',    ]
+
+Features=true_object.join(all_num).loc[:,[*ftrs0,*ftrs1]]
+
+d=pd.get_dummies(Features.select_dtypes(object))
+
+X=Features.select_dtypes('number').join(d).drop('price',axis=1).values
+
+Y=Features.price.values
+
+# -- end feature selection.
+
+from sklearn.linear_model import Ridge , ElasticNet as e
+from sklearn.model_selection import train_test_split as tts, GridSearchCV as gs
+xt,xs,yt,ys=tts(X,Y,test_size=0.2,random_state=2)
+
+for i in ( (Ridge(),{'alpha':np.linspace(0.35,0.8,20),  }), (e(),{'alpha':np.linspace(0.002,0.015,20), 'max_iter':[150000]}) ):
+            w=gs(i[0], i[1], cv=4).fit(xt,yt)
+            print(i[0],'\n test %.2f' % w.score(xt,yt),  w.best_params_, 'best score %.2f' %  w.best_score_)
+
+
+Program 4 End.
+
+Conclusion: Ridge, ElasticNet have the same train accuracy 0.912. Adding, subtracting features 'bore', 'wheel-base', 
+train accuracy varies from 0.910 thru 0.912.  if feature 'make' is deleted, train accuracy decreases to 0.87. 
+Good feature choice makes high accuracy. This process consumes time. Ridge test accuracy 0.88, ElasticNet 0.89.  
+Good alpha value chosen from a range makes high accuracy.  more alpha values, more models built, more execution time. 
+Alpha regularizes or reduces the effect of multicollinearity between features such as ‘curb-weight’, ‘length’, ‘width’, 
+‘wheel-base’,  which have Pearson coefficient ≈0.8 showed by all_num.corr(), by minimizing the coefficients of these features.  
+
+---------------------------------------------------------------------------
+
+
+
+Program 5, 
+Estimator, Algorithm: Ridge, ElasticNet.  GridSearchCV 
+Intent: regression,  exhaustive search best features, max accuracy 
+Data source: IBM 
+Preprocess: clean, massage, preprocess.  %%timeit used to measure completion time.
+
+Program start,
+
+%%timeit -n1 -r1
+
+import itertools
+from sklearn.linear_model import Ridge , ElasticNet as e
+from sklearn.model_selection import train_test_split as tts, GridSearchCV as gs
+import pandas as pd
+import numpy as np
+filename = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-DA0101EN-SkillsNetwork/labs/Data%20files/auto.csv"
+headers = ["symboling","normalized-losses","make","fuel-type","aspiration", "num-of-doors", "body-style", "drive-wheels","engine-location","wheel-base", "length","width","height", "curb-weight","engine-type", "num-of-cylinders", "engine-size","fuel-system","bore","stroke", "compression-ratio","horsepower", "peak-rpm","city-mpg","highway-mpg","price"]
+
+csv = pd.read_csv(filename, names = headers)
+df=csv.replace('?',np.nan).dropna(axis=0,subset=['price']).reset_index(drop=True)
+o=df.select_dtypes(include=[object  ]).drop('normalized-losses',axis=1)
+
+true_object=o.iloc[:, :-5 ]
+
+obj_to_num=o.iloc[:, -5: ].apply(pd.to_numeric,errors='coerce')
+n=df.select_dtypes(include=[ 'number'  ]).drop(['symboling', ],axis=1)
+
+all_num=obj_to_num.join(n).fillna({'bore': obj_to_num.bore.mean(),'stroke': obj_to_num.stroke.mean(), 'horsepower': obj_to_num.horsepower.mean(),'peak-rpm': obj_to_num['peak-rpm'].mean()} )
+
+# hand pick features based on Pearson correlation and ANOVA.                                                                    
+ftrs=[ 'horsepower','bore','length', 'width','curb-weight', 'engine-size','engine-location','make', 'drive-wheels', 'num-of-cylinders',  ]
+ 
+# max score from feature combination. 
+l=[]
+
+for i in range(1,len(ftrs)+1):
+    for k in list(itertools.combinations(ftrs,i)):
+            Features=true_object.join(all_num).loc[:, [*k] ]
+            if len(Features.select_dtypes(object).columns)!=0:
+                    d=pd.get_dummies(Features.select_dtypes(object))
+                    if len(Features.select_dtypes('number').columns)!=0:
+                            X=d.join(Features.select_dtypes('number')).values
+                    else: X=d.values
+            else: X=Features.values
+        
+            Y=obj_to_num.price.values
+        
+            xt,xs,yt,ys=tts(X,Y,test_size=0.2,random_state=2)
+
+            for m in ( (Ridge(),{'alpha':np.linspace(0.35,0.8,20),  }), (e(),{'alpha':np.linspace(0.002,0.015,20), 'max_iter':[150000]}) ):
+                w=gs(m[0], m[1], cv=4).fit(xt,yt)
+                l.append([k, m[0],   'test %.2f' % w.score(xt,yt),  w.best_params_,   'best_score %.2f' % w.best_score_])
+            
+print(sorted(l, key=lambda x: x[4],reverse=1)[0])
+
+
+
+Program 5 End.
+
+Conclusion: Program 5 results show  'horsepower', 'width','make', are the best features combination for max accuracy 0.91 that is same as Program 4. Feature exhaustive search from  ftrs=[ 'horsepower','bore','length', 'width','curb-weight', 'engine-size', 'engine-location',  'make', 'drive-wheels', 'num-of-cylinders',  ] that has a completion time of 16 minutes and 15 seconds, and 27min at another run. Program 4 takes less than 3 seconds.  This demonstrates ‘best score’ and efficiency is achievable via distinctive programmer’s ‘distinctive’ feature selection.
+
+—------------------------------------------------------------
+
+
+Program 6, 
+Estimator, Algorithm: RandomForestRegressor.  BayesSearchCV
+Intent: regression, auto characteristics, price .
+Data source: IBM 
+Preprocess: clean, massage, preprocess.
+
+
+Program start,
+
+!pip install scikit-optimize
+import pandas as pd
+import numpy as np
+
+filename = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-DA0101EN-SkillsNetwork/labs/Data%20files/auto.csv"
+headers = ["symboling","normalized-losses","make","fuel-type","aspiration", "num-of-doors","body-style",
+         "drive-wheels","engine-location","wheel-base", "length","width","height","curb-weight","engine-type",
+         "num-of-cylinders", "engine-size","fuel-system","bore","stroke","compression-ratio","horsepower",
+         "peak-rpm","city-mpg","highway-mpg","price"]
+
+csv = pd.read_csv(filename, names = headers)
+df=csv.replace('?',np.nan).dropna(axis=0,subset=['price']).reset_index(drop=True)
+o=df.select_dtypes(include=[object  ]).drop('normalized-losses',axis=1)
+
+true_object=o.iloc[:, :-5 ]
+
+cast_to_num=o.iloc[:, -5: ].apply(pd.to_numeric,errors='coerce') 
+n=df.select_dtypes(include=[ 'number'  ]).drop(['symboling', ],axis=1)
+
+num=cast_to_num.join(n)
+                                                                          
+all_num=num .fillna({'bore': num.bore.mean(), 'stroke': num.stroke.mean(), 'horsepower': num.horsepower.mean(), 'peak-rpm': num['peak-rpm'].mean(),    }  ) 
+
+                                                                      
+# -- start X Y feature selection.
+
+# Pearson correlation
+
+ftrs0=all_num.corr().query( (  '  price >0.5')   ).index
+# hand pick
+ftrs0=[ 'horsepower', 'price',  'bore',   'length', 'width',
+       'curb-weight', 'engine-size']
+ 
+    
+# ANOVA
+from scipy.stats import f_oneway as f
+for i in true_object.columns:
+    g=true_object.join(df.price)
+    print(i,f(* np.array((g.groupby(i)['price']),dtype=object)[:,1]))
+
+# hand pick ftrs1. 
+ftrs1 = [   'engine-location',   'make',   'drive-wheels',   'num-of-cylinders',    ]
+
+Features=true_object.join(all_num).loc[:,[*ftrs0,*ftrs1]]
+
+d=pd.get_dummies(Features.select_dtypes(object))
+
+X=Features.select_dtypes('number').join(d).drop('price',axis=1).values
+
+Y=Features.price.values
+
+import numpy as np
+from sklearn.model_selection import train_test_split as t
+from skopt import BayesSearchCV as b
+from sklearn.ensemble import RandomForestRegressor as r
+
+
+for i in [ 0.1  ]:
+     
+        np.random.seed(0)
+        xr,xs,yr,ys=t(X,Y,test_size=i,random_state=2)
+        w=b(r(),{'n_estimators' : np.arange(65,100,5),'criterion':['mse', ], 'max_depth' : np.arange(10,19,1), 
+                 'min_samples_split' : np.arange(2,4,1), 'min_samples_leaf': np.arange(1,3,1), 
+                 'max_features' :np.arange(1,5,1),   'random_state':[2] }, n_iter=50, n_points=10,random_state=2).fit(xr,yr)
+        print('test_size=', i,  'test',w.score(xs,ys),'best score',w.best_score_, '\n',w.best_params_,  )
+
+
+Program 6 End.
+
+Conclusion: RandomForestRegressor has the highest train accuracy of all. train 0.93, test 0.91. execution time 1 minute 42 seconds, 
+longest time of all estimators, due to parameter selection, which is similar to RandomForestClassifier.
+--------------------------------------------------------------------------------------
+
+
+Recommendation System, collaborative filtering: Program 7,8
+
+Program 7,  ‘compute Pearson P at once method’:
+
+Estimator, Algorithm: hand built
+Intent: recommend movies to a user based on ratings.
+Data source: IBM https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%205/data/moviedataset.zip
+Preprocess: clean, massage.
+
+
+Program start,
+
+#load, clean movies.csv data  
+m=pd.read_csv('movies.csv').drop('genres',axis=1)
+
+m['title']=m.title.str.replace(' +\(.+','').apply(lambda x: x.strip())
+
+r=pd.read_csv('ratings.csv').drop('timestamp',axis=1)
+
+
+user_input= [ {'title':'Breakfast Club, The', 'rating':5}, {'title':'Toy Story', 'rating':3.5}, {'title':'Jumanji', 'rating':2}, {'title':"Pulp Fiction", 'rating':5}, {'title':'Akira', 'rating':4.5} ]
+i=pd.DataFrame(user_input)
+
+
+#get all required users ratings from r.  1 movie : 2 ratings
+g= m.merge(i ).merge(r ,on ='movieId')  
+
+
+#add terms for Pearson computation
+g['xy']=g.rating_x*g.rating_y  
+g['x2']=g.rating_x**2
+g['y2']=g.rating_y**2
+
+
+#grouped userId.  sum grouped ratings.  sort, biggest group row count on top, output top 100.  All terms ready for Pearson similarity  P.
+q=g.groupby('userId') .agg({'rating_x':'sum','rating_y':'sum','x2':'sum','xy':'sum','y2':'sum', 'movieId':'count'}).sort_values(  'movieId' ,ascending=False)[0:100]
+
+
+# compute Pearson similarity P of ratings between ‘target user’ and every ‘other user’. set P>0.7
+p=(q.xy-q.rating_x*q.rating_y/q.movieId )   /   ((q.x2-q.rating_x**2/q.movieId )*( q.y2-q.rating_y**2/q. movieId ))**0.5
+p=p[p>0.7 ]
+
+# attach P to:   1, corresponding user. 2, that user's every movie rating.
+n=r.merge(p.rename('p'),on='userId')
+
+
+# compute target user’s ‘probable rating’, or to compute similarity rating R : multiply rating and associative P.  
+n['R']=n.p*n.rating
+
+
+#  sum all P, and sum all R belonging to each movie. Only P, R will be used.
+f=n.groupby('movieId').sum()
+
+
+# compute target user’s probable average movie rating on each movie. output Top100 ratings, highest on top.   
+Top100=(f.R/f.p).sort_values(ascending=False)[0:100].rename('score')
+
+# merge movieId and output movie titles.
+m.merge(Top100, on='movieId').sort_values('score',ascending=False)
+
+
+
+Program 7 End.
+Conclusion: Top100 movies are recommended. steps: users having the highest number of movies of the target user are selected.  compute similarity between target user and these users, via ratings of common movies.  Select the high similarity users. Compute target user’s probable rating on all movies watched by the high similarity users.  Compute the average probable rating on each movie. Select the highest probable ratings and movies. Condition for successful recommendation: target user must input rating; large number of users ratings on large number of movies;
+Next ‘Iterative method’, Program 8, is very similar to Program 7.  Program 7 computes all terms and P ‘at once’. Program 8 computes each P thru iterating userId groups.
+—-----------------------------------------------------------------
+
+
+Program 8,  ‘Iterative method’:
+
+Estimator, Algorithm: hand built
+Intent: recommend movies to a user based on ratings.
+Data source:  same as program 7.
+Preprocess: clean, massage.
+
+
+Program start,
+
+import pandas as pd
+import numpy as np
+
+#load, clean movies.csv data  
+m=pd.read_csv('movies.csv').drop('genres',axis=1)
+
+m['title']=m.title.str.replace(' +\(.+','').apply(lambda x: x.strip())
+
+r=pd.read_csv('ratings.csv').drop('timestamp',axis=1)
+
+
+user_input= [ {'title':'Breakfast Club, The', 'rating':5}, {'title':'Toy Story', 'rating':3.5}, {'title':'Jumanji', 'rating':2}, {'title':"Pulp Fiction", 'rating':5}, {'title':'Akira', 'rating':4.5} ]
+i=pd.DataFrame(user_input)
+#get all required users ratings from r.  1 movie : 2 ratings
+g= m.merge(i ).merge(r ,on ='movieId')  
+
+
+# convert into list: DataFrameGroupBy object, sort, dataframe or 'group' of largest row count to leftmost.
+u=sorted(g.groupby('userId'),key=lambda x: len(x[1]),reverse=1)
+
+# compute Pearson similarity P, group after group. pack userId, and associative P into list.
+l=[]
+for k,j in u[0:100]:
+    x=j.rating_x
+    y=j.rating_y
+    d=((sum(x **2) -sum(x)**2/len(j) ) * (sum(y **2) -sum(y)**2/len(j) ))**0.5
+    if d!=0:
+        p=(sum( x *y)-sum(x)*sum(y)/len(j))  / d
+        if p>0.7:
+            l.append([k,p])
+            
+
+# build DataFrame, attach P to: 1, corresponding user. 2, that user's every movie rating.                 
+n=pd.DataFrame(l,columns=['userId','p']).merge(r )
+
+# compute target user's probable rating: multiply associative P, rating
+n['R']=n.p*n.rating
+
+#  sum all P, and sum all R belonging to each movie.
+f=n.groupby('movieId')['R','p'].sum()
+# compute average movie rating on each movie. Top100 ratings, highest on top.
+Top100=(f.R/f.p).rename('score').sort_values(ascending=False)[0:100]
+
+# merge movieId and output movie titles.
+m.merge(Top100,on='movieId' ).sort_values('movieId',ascending=False) 
+
+Program 8 End.
+
+Conclusion: Top100 movies are recommended similar to program 7. Here,  %%timeit was used to measure completion time: ‘Iterative method’ 12 seconds;  
+‘compute P at once method’ 10 seconds.  ‘compute P at once method’ is faster than ‘Iterative method’ if large data is encountered. 
+
+----------------------------------------------------
+
+
+
+
+Python Final Remark:
+
+It’s generalizing past knowledge, the data, and ‘foretelling something’ based on that generalization. To get this done, 
+getting access to tools like Python and libraries is important. The way to implement the tools and data is important.  
+The more resource saving and more accuracy, the better. If one day, people can make simple commands to ‘auto compose’ 
+the programs that programmers composed like those demonstrated here, then that’s fantastic. Maybe in the future.
+
+To the million-year human development , Python or digital computing is an ‘eye-blinking’. There is a lot that needs to 
+progress forward. Just take a look at the telephone. It takes 150 years to get to the year of 2022, from a ‘device’ of 
+1876  to 2022 ‘the powerful A15 Bionic, 5G’ iPhone.  See pictures, credits to wikipedia.org and apple.com.  
+                             
+
+Was there someone in 1876 imagining something like iPhone 2022 would happen?
+
+
+Section 1, Python End.
