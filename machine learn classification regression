@@ -348,7 +348,11 @@ print(sorted(l, key=lambda x: x[4],reverse=1)[0])
 
 Program 5 End.
 
-Conclusion: Program 5 results show  'horsepower', 'width','make', are the best features combination for max accuracy 0.91 that is same as Program 4. Feature exhaustive search from  ftrs=[ 'horsepower','bore','length', 'width','curb-weight', 'engine-size', 'engine-location',  'make', 'drive-wheels', 'num-of-cylinders',  ] that has a completion time of 16 minutes and 15 seconds, and 27min at another run. Program 4 takes less than 3 seconds.  This demonstrates ‘best score’ and efficiency is achievable via distinctive programmer’s ‘distinctive’ feature selection.
+Conclusion: Program 5 results show  'horsepower', 'width','make', are the best features combination for max accuracy 0.91 that is same as Program 4. 
+Feature exhaustive search from  ftrs=[ 'horsepower','bore','length', 'width','curb-weight', 'engine-size', 'engine-location',  'make', 'drive-wheels', 'num-of-cylinders'] 
+that has a completion time of 16 minutes and 15 seconds, and 27min at another run. Program 4 takes less than 3 seconds.  This demonstrates ‘best score’ and 
+efficiency is achievable via distinctive programmer’s ‘distinctive’ feature selection.
+
 
 —------------------------------------------------------------
 
@@ -499,8 +503,13 @@ m.merge(Top100, on='movieId').sort_values('score',ascending=False)
 
 
 Program 7 End.
-Conclusion: Top100 movies are recommended. steps: users having the highest number of movies of the target user are selected.  compute similarity between target user and these users, via ratings of common movies.  Select the high similarity users. Compute target user’s probable rating on all movies watched by the high similarity users.  Compute the average probable rating on each movie. Select the highest probable ratings and movies. Condition for successful recommendation: target user must input rating; large number of users ratings on large number of movies;
-Next ‘Iterative method’, Program 8, is very similar to Program 7.  Program 7 computes all terms and P ‘at once’. Program 8 computes each P thru iterating userId groups.
+Conclusion: Top100 movies are recommended. steps: users having the highest number of movies of the target user are selected;  
+compute similarity between target user and these users, via ratings of common movies; select the high similarity users; 
+compute target user’s probable rating on all movies watched by the high similarity users; compute the average probable 
+rating on each movie; select the highest probable ratings and movies. Condition for successful recommendation: 
+target user must input rating; large number of users ratings on large number of movies;
+Next ‘Iterative method’, Program 8, is very similar to Program 7.  Program 7 computes all terms and P ‘at once’. 
+Program 8 computes each P thru iterating userId groups.
 —-----------------------------------------------------------------
 
 
