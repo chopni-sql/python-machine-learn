@@ -83,7 +83,9 @@ for i in (
 
 Program 1 End.  
 
-Conclusion: SVC, LogisticRegression, KNeighbors train accuracy is the same 0.89. test data accuracy is 0.84. If Orbit is the only X feature, train, test accuracy remain the same 0.89, 0.84 as full features. Model accuracy remains 0.89 even when parameters vary within some range . so, at 'some point', parameter adjustment can be stopped.    
+Conclusion: SVC, LogisticRegression, KNeighbors train accuracy is the same 0.89. test data accuracy is 0.84. If Orbit is the only X feature, train, 
+test accuracy remain the same 0.89, 0.84 as full features. Model accuracy remains 0.89 even when parameters vary within some range . so, at 'some point', 
+parameter adjustment can be stopped.    
 
 
 --------------------------------------------------------------------------------------
